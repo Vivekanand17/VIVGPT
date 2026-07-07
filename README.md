@@ -1,6 +1,6 @@
-# BappyGPT
+# VIVGPT
 
-BappyGPT is an open-source **agentic AI chatbot** built with **Python, FastAPI, LangGraph, LangChain, Google Gemini, Tavily, ChromaDB, and SQLite**.
+VIVGPT is an open-source **agentic AI chatbot** built with **Python, FastAPI, LangGraph, LangChain, Google Gemini, Tavily, ChromaDB, and SQLite**.
 
 It supports real-time streaming chat, document uploads, retrieval-augmented generation (RAG), web search, conversation memory, and a simple web UI.
 
@@ -67,7 +67,7 @@ git clone https://github.com/entbappy/BappyGPT.git
 ### 2. Navigate to the project directory
 
 ```bash
-cd BappyGPT
+cd VIVGPT
 ```
 
 ### 3. Create a virtual environment
@@ -75,13 +75,13 @@ cd BappyGPT
 Using conda:
 
 ```bash
-conda create -n bappygpt python=3.11 -y
+conda create -n vivgpt python=3.11 -y
 ```
 
 ### 4. Activate the virtual environment
 
 ```bash
-conda activate bappygpt
+conda activate vivgpt
 ```
 
 ### 5. Install dependencies
@@ -161,18 +161,18 @@ BappyGPT/
 ### 1. Build the Docker image
 
 ```bash
-docker build -t bappygpt .
+docker build -t vivgpt .
 ```
 
 ### 2. Run the Docker container
 
 ```bash
 docker run -d \
-  --name bappygpt \
+  --name vivgpt \
   --restart always \
   -p 8080:8080 \
   --env-file .env \
-  bappygpt
+  vivgpt
 ```
 
 The app will be available at:
@@ -215,13 +215,13 @@ Create an Amazon ECR repository.
 Example full ECR image URI:
 
 ```text
-315865595366.dkr.ecr.us-east-1.amazonaws.com/bappygpt
+315865595366.dkr.ecr.us-east-1.amazonaws.com/vivgpt
 ```
 
 For GitHub Secrets, only save the repository name:
 
 ```text
-ECR_REPO=bappygpt
+ECR_REPO=vivgpt
 ```
 
 Do not save the full ECR URI as `ECR_REPO`.
