@@ -13,8 +13,8 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request, UploadFile, File, Form
-from fastapi.responses import StreamingResponse, JSONResponse
-from fastapi.templating import Jinja2Templates
+from fastapi.responses import StreamingResponse, JSONResponse, FileResponse
+from fastapi.staticfiles import StaticFiles
 
 from langchain_core.messages import (
     HumanMessage,
@@ -37,8 +37,7 @@ from tools import set_current_thread_id
 
 app = FastAPI()
 
-templates = Jinja2Templates(directory="templates")
-
+STATIC_DIR = Path("static")
 Path("uploads").mkdir(exist_ok=True)
 Path("data").mkdir(exist_ok=True)
 
@@ -46,13 +45,18 @@ Path("data").mkdir(exist_ok=True)
 init_db()
 
 
+if STATIC_DIR.exists():
+    assets_dir = STATIC_DIR / "assets"
+    if assets_dir.exists():
+        app.mount("/assets", StaticFiles(directory=str(assets_dir)), name="assets")
+
+
 @app.get("/")
-async def home(request: Request):
-    return templates.TemplateResponse(
-        request=request,
-        name="index.html",
-        context={}
-    )
+async def home():
+    index_path = STATIC_DIR / "index.html"
+    if index_path.exists():
+        return FileResponse(str(index_path))
+    return FileResponse("templates/index.html")
 
 
 
