@@ -61,7 +61,7 @@ Optional for deployment:
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/entbappy/BappyGPT.git
+git clone https://github.com/Vivekanand17/VIVGPT.git
 ```
 
 ### 2. Navigate to the project directory
