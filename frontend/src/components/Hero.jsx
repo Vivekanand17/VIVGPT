@@ -10,9 +10,10 @@ const typewriterText =
 export default function Hero({ onTryVivgpt }) {
   const { displayText } = useTypewriter(typewriterText, 50);
 
-  const scrollToChat = () => {
+  const openChat = () => {
     onTryVivgpt();
   };
+
 
   return (
     <section className="relative min-h-screen overflow-hidden">
@@ -138,7 +139,8 @@ export default function Hero({ onTryVivgpt }) {
               transition={{ duration: 0.6, delay: 0.7 }}
               whileHover={{ scale: 1.05 }}
               whileTap={{ scale: 0.97 }}
-              onClick={scrollToChat}
+              onClick={openChat}
+
               className="group mb-12 inline-flex items-center gap-3 rounded-full bg-white px-8 py-4 text-base font-semibold text-black shadow-[0_0_40px_rgba(255,255,255,0.15)] transition hover:shadow-[0_0_60px_rgba(255,255,255,0.25)]"
             >
               Try VIVGPT

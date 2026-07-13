@@ -13,10 +13,11 @@ const navLinks = [
 export default function Navbar({ onTryVivgpt }) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  const scrollToChat = () => {
+  const openChat = () => {
     setMobileOpen(false);
     onTryVivgpt();
   };
+
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50">
@@ -54,11 +55,12 @@ export default function Navbar({ onTryVivgpt }) {
             type="button"
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.97 }}
-            onClick={scrollToChat}
+            onClick={openChat}
             className="rounded-full bg-white px-6 py-3 text-sm font-semibold text-black transition"
           >
             Try VIVGPT
           </motion.button>
+
         </div>
 
         {/* Hamburger — mobile */}
@@ -103,7 +105,8 @@ export default function Navbar({ onTryVivgpt }) {
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
-                onClick={scrollToChat}
+                onClick={openChat}
+
                 className="mt-1 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black"
               >
                 Try VIVGPT

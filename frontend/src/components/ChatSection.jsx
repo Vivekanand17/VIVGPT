@@ -620,7 +620,11 @@ export default function ChatSection() {
                       : "text-neutral-200"
                   }`}
                 >
-                  {msg.content}
+                  {String(msg.content)
+                    .replace(/\*\*(.*?)\*\*/g, "$1")
+                    .replace(/(^|\n)\s*[-*]\s+/g, "$1")
+                    .replace(/(^|\n)\s*#{1,6}\s+/g, "$1")
+                    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")}
                 </div>
                 {msg.role === "user" && (
                   <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white">
