@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import {
   Paperclip,
@@ -8,7 +8,13 @@ import {
   Plus,
   Loader2,
   Check,
+  Sparkles,
+  Search,
+  FileText,
+  Brain,
+  Calculator,
 } from "lucide-react";
+
 
 const MODELS = [
   "gemini-2.5-flash",
@@ -21,21 +27,26 @@ const MODELS = [
 const WELCOME_CARDS = [
   {
     text: "Search the web for latest AI agent news.",
-    label: "Search latest web info",
+    label: "🔍 Search latest web info",
+    icon: Search,
   },
   {
     text: "Summarize the document I uploaded.",
-    label: "Summarize uploaded document",
+    label: "📄 Analyze documents",
+    icon: FileText,
   },
   {
     text: "Remember that my channel name is dswithbappy.",
-    label: "Save something to memory",
+    label: "🧠 Save memory",
+    icon: Brain,
   },
   {
     text: "Calculate 125 * 48 / 6",
-    label: "Use calculator tool",
+    label: "🧮 Run calculations",
+    icon: Calculator,
   },
 ];
+
 
 function detectLikelyTool(message) {
   const text = message.toLowerCase();
@@ -104,7 +115,10 @@ export default function ChatSection() {
   const [toolProgress, setToolProgress] = useState(null);
   const [isDictating, setIsDictating] = useState(false);
 
+  const sparkSeed = useMemo(() => Math.random(), []);
+
   const chatContainerRef = useRef(null);
+
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -518,24 +532,74 @@ export default function ChatSection() {
       whileInView={{ opacity: 1, y: 0 }}
       viewport={{ once: true, margin: "-50px" }}
       transition={{ duration: 0.8 }}
-      className="relative min-h-screen bg-[#0B0F14]"
+      className="relative min-h-screen overflow-hidden"
     >
-      <div className="flex h-screen overflow-hidden">
+      {/* Background */}
+      <div className="gradient-mesh absolute inset-0" />
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_10%,rgba(139,92,246,0.20),transparent_40%),radial-gradient(circle_at_80%_30%,rgba(56,189,248,0.15),transparent_45%),radial-gradient(circle_at_50%_90%,rgba(16,185,129,0.12),transparent_50%)]" />
+
+      {/* Animated gradient blobs */}
+      <motion.div
+        animate={{ x: [0, 30, 0], y: [0, -20, 0] }}
+        transition={{ duration: 12, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute -left-24 top-16 h-96 w-96 rounded-full bg-violet-600/10 blur-[90px]"
+      />
+      <motion.div
+        animate={{ x: [0, -20, 0], y: [0, 30, 0] }}
+        transition={{ duration: 15, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute -right-24 top-1/3 h-80 w-80 rounded-full bg-sky-400/8 blur-[85px]"
+      />
+      <motion.div
+        animate={{ opacity: [0.25, 0.55, 0.25] }}
+        transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+        className="absolute bottom-0 left-1/2 h-64 w-[600px] -translate-x-1/2 rounded-full bg-emerald-500/5 blur-[80px]"
+      />
+
+      {/* Floating background particles */}
+      {Array.from({ length: 18 }).map((_, i) => (
+        <motion.div
+          key={`${sparkSeed}-${i}`}
+          className="absolute h-1 w-1 rounded-full bg-white/20"
+          style={{ left: `${(i * 7 + sparkSeed * 100) % 100}%`, top: `${(i * 13 + sparkSeed * 100) % 100}%` }}
+          animate={{ y: [0, -36 - (i % 7) * 6, 0], opacity: [0.05, 0.7, 0.05] }}
+          transition={{
+            duration: 9 + (i % 5),
+            repeat: Infinity,
+            delay: (i % 6) * 0.4,
+            ease: "easeInOut",
+          }}
+        />
+      ))}
+
+      <div className="relative flex h-screen overflow-hidden">
+
         {/* Sidebar */}
-        <aside className="hidden w-[270px] flex-shrink-0 flex-col border-r border-white/5 bg-[#050505] p-3 md:flex">
-          <div className="px-3 py-3 text-lg font-bold text-white">VIVGPT</div>
+        <aside className="hidden w-[270px] flex-shrink-0 flex-col border-r border-white/10 bg-white/[0.03] p-3 md:flex backdrop-blur">
+          <div className="flex items-center gap-2 px-3 py-4">
+            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
+              <Sparkles className="h-4.5 w-4.5 text-violet-300" />
+            </div>
+            <div className="text-lg font-extrabold tracking-tight">
+              <span className="bg-gradient-to-r from-white via-violet-200 to-sky-200 bg-clip-text text-transparent">
+                VIVGPT
+              </span>
+            </div>
+          </div>
 
           <button
             type="button"
             onClick={newChat}
-            className="mb-4 flex items-center gap-2 rounded-xl border border-white/10 px-3 py-3 text-left text-sm text-neutral-300 transition hover:bg-white/5"
+            className="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3 py-3 text-sm font-semibold text-violet-100 shadow-[0_0_30px_rgba(139,92,246,0.18)] transition hover:shadow-[0_0_55px_rgba(139,92,246,0.28)] hover:bg-violet-500/20"
           >
             <Plus className="h-4 w-4" />
-            New chat
+             New Chat
           </button>
 
-          <div className="mb-2 px-1 text-xs text-neutral-500">Recent Chats</div>
+          <div className="mb-2 px-3 text-xs font-medium text-neutral-400">
+            Recent Chats
+          </div>
           <div className="flex-1 overflow-y-auto pr-1">
+
             {conversations.length === 0 ? (
               <div className="rounded-lg px-2.5 py-2.5 text-sm text-neutral-500">
                 No chats yet
@@ -547,11 +611,12 @@ export default function ChatSection() {
                   type="button"
                   onClick={() => loadConversation(conv.thread_id)}
                   className={`mb-1 w-full truncate rounded-lg px-2.5 py-2.5 text-left text-sm transition ${
-                    conv.thread_id === threadId
-                      ? "bg-white/10 text-white"
+                  conv.thread_id === threadId
+                      ? "bg-gradient-to-r from-violet-500/25 to-sky-400/15 border-l-2 border-violet-400/70 pl-2 text-white"
                       : "text-neutral-400 hover:bg-white/5 hover:text-neutral-200"
                   }`}
                 >
+
                   {conv.title || "New Chat"}
                 </button>
               ))
@@ -562,12 +627,29 @@ export default function ChatSection() {
         {/* Main chat area */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {/* Topbar */}
-          <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/5 px-6">
-            <div className="text-base font-semibold text-white">
-              Agentic AI Chatbot
+          <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(5,8,22,0.7)] px-6 backdrop-blur">
+            <div className="flex items-center gap-3">
+              <div className="text-lg font-bold">
+                <span className="bg-gradient-to-r from-white via-violet-200 to-sky-200 bg-clip-text text-transparent">
+                  Agentic AI Chatbot
+                </span>
+              </div>
             </div>
-            <div className="text-sm text-neutral-400">{status}</div>
+
+            <div className="flex items-center gap-2 text-sm font-medium text-neutral-300">
+              <span className="relative flex items-center gap-2">
+                <span className="relative inline-flex h-2 w-2">
+                  <span
+                    className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400/70"
+                    style={{ animationDuration: "1.5s" }}
+                  />
+                  <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
+                </span>
+                <span className="text-neutral-200">{status === "Ready" ? " Ready" : status}</span>
+              </span>
+            </div>
           </div>
+
 
           {/* Messages */}
           <div
@@ -576,48 +658,81 @@ export default function ChatSection() {
           >
             {showWelcome && messages.length === 0 && (
               <>
-                <div className="mx-auto mt-16 max-w-2xl text-center md:mt-24">
-                  <h2 className="mb-3 text-3xl font-semibold text-white">
-                    How can I help you today?
+                <div className="mx-auto mt-12 max-w-3xl text-center md:mt-16">
+                  <div className="relative mx-auto mb-6 h-24 w-full max-w-xl">
+                    <motion.div
+                      initial={{ opacity: 0, scale: 0.9 }}
+                      animate={{ opacity: 1, scale: 1 }}
+                      transition={{ duration: 0.6 }}
+                      className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-violet-500/30 via-sky-400/20 to-emerald-400/10 blur-[2px]"
+                    />
+                    <motion.div
+                      animate={{ y: [0, -10, 0] }}
+                      transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                      className="relative mx-auto h-24 w-24 rounded-full bg-violet-500/10 ring-1 ring-violet-400/20"
+                    >
+                      <div className="absolute inset-2 rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.35),rgba(139,92,246,0.45),rgba(56,189,248,0.15))]" />
+                      <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 blur-[1px]" />
+                    </motion.div>
+                  </div>
+
+                  <h2 className="mb-3 text-4xl font-semibold tracking-tight text-white">
+                    Your AI Agent is Ready
                   </h2>
-                  <p className="text-neutral-400">
-                    Ask questions, upload documents, use tools, search the web,
-                    and chat with memory.
+                  <p className="mx-auto max-w-2xl text-neutral-400">
+                    Ask questions, analyze documents, search the web and automate tasks.
                   </p>
                 </div>
 
                 <div className="mx-auto mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-                  {WELCOME_CARDS.map((card) => (
-                    <button
-                      key={card.label}
-                      type="button"
-                      onClick={() => usePrompt(card.text)}
-                      className="rounded-2xl border border-white/10 p-4 text-left text-sm text-neutral-300 transition hover:border-white/20 hover:bg-white/5"
-                    >
-                      {card.label}
-                    </button>
-                  ))}
+                  {WELCOME_CARDS.map((card, idx) => {
+                    const Icon = card.icon;
+                    return (
+                      <motion.button
+                        key={card.label}
+                        type="button"
+                        onClick={() => usePrompt(card.text)}
+                        whileHover={{ scale: 1.03 }}
+                        transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                        className="group rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left text-sm text-neutral-300 backdrop-blur transition hover:border-white/20"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-sky-400/15 ring-1 ring-white/10">
+                            <Icon className="h-4 w-4 text-violet-300" />
+                          </div>
+                          <div className="font-medium text-neutral-100 group-hover:text-white">
+                            {card.label}
+                          </div>
+                        </div>
+                      </motion.button>
+                    );
+                  })}
                 </div>
+
               </>
             )}
 
             {messages.map((msg, i) => (
-              <div
+              <motion.div
                 key={i}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.4 }}
                 className={`mx-auto mb-7 flex max-w-3xl gap-3 ${
                   msg.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
                 {msg.role === "assistant" && (
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-emerald-600 text-xs font-bold text-white">
-                    AI
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-sky-400 shadow-[0_0_30px_rgba(139,92,246,0.25)]">
+                    <span className="text-xs font-bold text-white">AI</span>
                   </div>
                 )}
+
                 <div
                   className={`max-w-[75%] whitespace-pre-wrap break-words text-base leading-relaxed ${
-                    msg.role === "user"
-                      ? "rounded-2xl rounded-br-sm border border-white/10 bg-white/10 px-4 py-3 text-neutral-100"
-                      : "text-neutral-200"
+                  msg.role === "user"
+                      ? "rounded-2xl border border-white/10 bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-white shadow-[0_0_40px_rgba(139,92,246,0.20)]"
+                      : "rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-neutral-100"
                   }`}
                 >
                   {String(msg.content)
@@ -627,16 +742,17 @@ export default function ChatSection() {
                     .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")}
                 </div>
                 {msg.role === "user" && (
-                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full bg-violet-600 text-xs font-bold text-white">
-                    U
+                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-sky-400/20 ring-1 ring-white/10">
+                    <span className="text-xs font-bold text-white">U</span>
                   </div>
                 )}
-              </div>
+
+              </motion.div>
             ))}
 
             {toolProgress && (
               <div className="mx-auto mb-4 flex max-w-3xl justify-start">
-                <div className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-sm text-neutral-300">
+                <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-neutral-300 backdrop-blur shadow-[0_0_35px_rgba(16,185,129,0.10)]">
                   {toolProgress.done ? (
                     <Check className="h-3.5 w-3.5 text-emerald-400" />
                   ) : (
@@ -648,11 +764,13 @@ export default function ChatSection() {
                 </div>
               </div>
             )}
+
           </div>
 
           {/* Input area */}
-          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-[#0B0F14] via-[#0B0F14]/95 to-transparent px-5 pb-6 pt-8 md:left-[270px]">
-            <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-2xl border border-white/10 bg-white/5 p-3 shadow-lg backdrop-blur-xl">
+          <div className="absolute bottom-0 left-0 right-0 px-5 pb-6 pt-10 md:left-[270px]">
+            <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-3xl border border-white/10 bg-white/[0.06] p-3 shadow-[0_0_60px_rgba(139,92,246,0.10)] backdrop-blur-xl">
+
               <input
                 ref={fileInputRef}
                 type="file"
@@ -717,10 +835,11 @@ export default function ChatSection() {
                 type="button"
                 onClick={sendMessage}
                 disabled={isSending}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl bg-white text-black transition hover:bg-neutral-100 disabled:cursor-not-allowed disabled:bg-neutral-600 disabled:text-neutral-400"
+                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-sky-400 text-white shadow-[0_0_60px_rgba(139,92,246,0.35)] transition hover:scale-110 disabled:cursor-not-allowed disabled:scale-100 disabled:opacity-60"
               >
                 <Send className="h-4 w-4" />
               </button>
+
             </div>
 
             <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-neutral-500">
