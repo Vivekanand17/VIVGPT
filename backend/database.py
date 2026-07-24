@@ -181,3 +181,39 @@ def search_memory(thread_id: str, query: str):
 
     finally:
         db.close()
+
+
+def rename_conversation(thread_id: str, new_title: str) -> bool:
+    db = SessionLocal()
+    try:
+        conversation = (
+            db.query(Conversation)
+            .filter(Conversation.thread_id == thread_id)
+            .first()
+        )
+        if conversation:
+            conversation.title = new_title
+            conversation.updated_at = datetime.utcnow()
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()
+
+
+def delete_conversation(thread_id: str) -> bool:
+    db = SessionLocal()
+    try:
+        conversation = (
+            db.query(Conversation)
+            .filter(Conversation.thread_id == thread_id)
+            .first()
+        )
+        if conversation:
+            db.delete(conversation)
+            db.query(ChatMessage).filter(ChatMessage.thread_id == thread_id).delete()
+            db.commit()
+            return True
+        return False
+    finally:
+        db.close()

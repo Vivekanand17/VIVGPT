@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, Menu, X } from "lucide-react";
+import { SignInButton, UserButton, useUser } from "@clerk/clerk-react";
 
 const navLinks = [
   { label: "Features", href: "#features" },
@@ -12,12 +13,12 @@ const navLinks = [
 
 export default function Navbar({ onTryVivgpt }) {
   const [mobileOpen, setMobileOpen] = useState(false);
+  const { isSignedIn } = useUser();
 
   const openChat = () => {
     setMobileOpen(false);
     onTryVivgpt();
   };
-
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50">
@@ -45,12 +46,23 @@ export default function Navbar({ onTryVivgpt }) {
 
         {/* Right buttons — desktop */}
         <div className="hidden items-center gap-3 md:flex">
-          <button
-            type="button"
-            className="rounded-full px-6 py-3 text-sm font-medium text-white/70 transition hover:text-white"
-          >
-            Login
-          </button>
+          {isSignedIn ? (
+            <UserButton
+              appearance={{
+                elements: {
+                  userButtonAvatarBox: "h-9 w-9",
+                  userButtonPopoverCard: "bg-[#1a1a2e] border border-white/10",
+                  userButtonPopoverActionItem: "text-neutral-200 hover:text-white",
+                },
+              }}
+            />
+          ) : (
+            <SignInButton mode="modal">
+              <div className="cursor-pointer rounded-full px-6 py-3 text-sm font-medium text-white/70 transition hover:text-white">
+                Login
+              </div>
+            </SignInButton>
+          )}
           <motion.button
             type="button"
             whileHover={{ scale: 1.05 }}
@@ -60,7 +72,6 @@ export default function Navbar({ onTryVivgpt }) {
           >
             Try VIVGPT
           </motion.button>
-
         </div>
 
         {/* Hamburger — mobile */}
@@ -96,17 +107,28 @@ export default function Navbar({ onTryVivgpt }) {
                 </a>
               ))}
               <hr className="my-2 border-white/10" />
-              <button
-                type="button"
-                className="rounded-lg px-3 py-3 text-left text-sm text-white/70 transition hover:text-white"
-              >
-                Login
-              </button>
+{isSignedIn ? (
+                <div className="px-3 py-2">
+                  <UserButton
+                    appearance={{
+                      elements: {
+                        userButtonAvatarBox: "h-8 w-8",
+                        userButtonPopoverCard: "bg-[#1a1a2e] border border-white/10",
+                      },
+                    }}
+                  />
+                </div>
+              ) : (
+                <SignInButton mode="modal">
+                  <div className="w-full cursor-pointer rounded-lg px-3 py-3 text-left text-sm text-white/70 transition hover:text-white">
+                    Login
+                  </div>
+                </SignInButton>
+              )}
               <motion.button
                 type="button"
                 whileTap={{ scale: 0.97 }}
                 onClick={openChat}
-
                 className="mt-1 rounded-full bg-white px-6 py-3 text-sm font-semibold text-black"
               >
                 Try VIVGPT

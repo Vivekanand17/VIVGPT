@@ -23,16 +23,18 @@ from langchain_core.messages import (
     ToolMessage
 )
 
-from agent import get_agent
-from database import (
+from backend.agent import get_agent
+from backend.database import (
     init_db,
     save_chat_message,
     get_chat_history,
     create_or_update_conversation,
-    list_conversations)
+    list_conversations,
+    rename_conversation,
+    delete_conversation)
 
-from rag import add_document_to_rag
-from tools import set_current_thread_id
+from backend.rag import add_document_to_rag
+from backend.tools import set_current_thread_id
 
 
 app = FastAPI()
@@ -142,6 +144,34 @@ async def upload_document(
             },
             status_code=500
         )
+
+
+
+@app.patch("/conversations/{thread_id}/rename")
+async def rename_conversation_endpoint(thread_id: str, request: Request):
+    try:
+        data = await request.json()
+        new_title = data.get("title", "").strip()
+        if not new_title:
+            return JSONResponse({"success": False, "message": "Title is required."}, status_code=400)
+
+        success = rename_conversation(thread_id, new_title)
+        if success:
+            return JSONResponse({"success": True, "message": "Conversation renamed."})
+        return JSONResponse({"success": False, "message": "Conversation not found."}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
+
+
+@app.delete("/conversations/{thread_id}")
+async def delete_conversation_endpoint(thread_id: str):
+    try:
+        success = delete_conversation(thread_id)
+        if success:
+            return JSONResponse({"success": True, "message": "Conversation deleted."})
+        return JSONResponse({"success": False, "message": "Conversation not found."}, status_code=404)
+    except Exception as e:
+        return JSONResponse({"success": False, "message": str(e)}, status_code=500)
 
 
 
@@ -301,7 +331,7 @@ async def chat_stream(request: Request):
 if __name__ == "__main__":
    
     uvicorn.run(
-        "app:app",
+        "backend.app:app",
         host="0.0.0.0",
         port=8080,
         reload=True

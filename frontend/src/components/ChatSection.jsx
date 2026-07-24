@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import {
   Paperclip,
   Mic,
@@ -13,6 +13,13 @@ import {
   FileText,
   Brain,
   Calculator,
+  Menu,
+  X,
+  Pin,
+  PinOff,
+  MoreHorizontal,
+  Trash2,
+  Pencil,
 } from "lucide-react";
 
 
@@ -27,22 +34,22 @@ const MODELS = [
 const WELCOME_CARDS = [
   {
     text: "Search the web for latest AI agent news.",
-    label: "🔍 Search latest web info",
+    label: "\ud83d\udd0d Search latest web info",
     icon: Search,
   },
   {
     text: "Summarize the document I uploaded.",
-    label: "📄 Analyze documents",
+    label: "\ud83d\udcc4 Analyze documents",
     icon: FileText,
   },
   {
     text: "Remember that my channel name is dswithbappy.",
-    label: "🧠 Save memory",
+    label: "\ud83e\udde0 Save memory",
     icon: Brain,
   },
   {
     text: "Calculate 125 * 48 / 6",
-    label: "🧮 Run calculations",
+    label: "\ud83e\uddee Run calculations",
     icon: Calculator,
   },
 ];
@@ -115,18 +122,61 @@ export default function ChatSection() {
   const [toolProgress, setToolProgress] = useState(null);
   const [isDictating, setIsDictating] = useState(false);
 
+  // Sidebar toggle state
+  const [sidebarOpen, setSidebarOpen] = useState(() => {
+    const saved = localStorage.getItem("sidebar_open");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  // Pinned threads state
+  const [pinnedThreads, setPinnedThreads] = useState(() => {
+    try {
+      const saved = localStorage.getItem("pinned_threads");
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  });
+
+  // Three-dot menu state
+  const [menuOpenThread, setMenuOpenThread] = useState(null);
+
+  // Rename state
+  const [renamingThread, setRenamingThread] = useState(null);
+  const [renameValue, setRenameValue] = useState("");
+
+  // Delete confirmation state
+  const [deleteConfirmThread, setDeleteConfirmThread] = useState(null);
+
+  // Search query state
+  const [searchQuery, setSearchQuery] = useState("");
+
   const sparkSeed = useMemo(() => Math.random(), []);
 
   const chatContainerRef = useRef(null);
-
   const textareaRef = useRef(null);
   const fileInputRef = useRef(null);
   const recognitionRef = useRef(null);
+  const menuRef = useRef(null);
+  const renameInputRef = useRef(null);
+
+  // Close menu on click outside
+  useEffect(() => {
+    const handleClickOutside = (e) => {
+      if (menuRef.current && !menuRef.current.contains(e.target)) {
+        setMenuOpenThread(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   const scrollToBottom = useCallback(() => {
     if (chatContainerRef.current) {
-      chatContainerRef.current.scrollTop =
-        chatContainerRef.current.scrollHeight;
+      chatContainerRef.current.scrollTo({
+        top: chatContainerRef.current.scrollHeight,
+        behavior: "smooth",
+      });
     }
   }, []);
 
@@ -525,6 +575,136 @@ export default function ChatSection() {
     }
   };
 
+  // Sidebar toggle
+  const toggleSidebar = () => {
+    setSidebarOpen((prev) => {
+      const newVal = !prev;
+      localStorage.setItem("sidebar_open", newVal);
+      return newVal;
+    });
+  };
+
+  // Pin / Unpin
+  const togglePin = (convThreadId) => {
+    setPinnedThreads((prev) => {
+      let updated;
+      if (prev.includes(convThreadId)) {
+        updated = prev.filter((id) => id !== convThreadId);
+      } else {
+        updated = [...prev, convThreadId];
+      }
+      localStorage.setItem("pinned_threads", JSON.stringify(updated));
+      return updated;
+    });
+  };
+
+  // Rename
+  const startRenaming = (conv) => {
+    setRenamingThread(conv.thread_id);
+    setRenameValue(conv.title || "New Chat");
+    setMenuOpenThread(null);
+  };
+
+  const submitRename = async () => {
+    if (!renamingThread) return;
+    const newTitle = renameValue.trim();
+    if (newTitle) {
+      try {
+        await fetch(`/conversations/${renamingThread}/rename`, {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ title: newTitle }),
+        });
+        await loadConversations();
+      } catch (error) {
+        console.error("Failed to rename:", error);
+      }
+    }
+    setRenamingThread(null);
+    setRenameValue("");
+  };
+
+  const handleRenameKeyDown = (e) => {
+    if (e.key === "Enter") {
+      e.preventDefault();
+      submitRename();
+    } else if (e.key === "Escape") {
+      setRenamingThread(null);
+      setRenameValue("");
+    }
+  };
+
+  // Delete
+  const confirmDelete = (convThreadId) => {
+    setDeleteConfirmThread(convThreadId);
+    setMenuOpenThread(null);
+  };
+
+  const executeDelete = async () => {
+    if (!deleteConfirmThread) return;
+    try {
+      const response = await fetch(`/conversations/${deleteConfirmThread}`, {
+        method: "DELETE",
+      });
+      const data = await response.json();
+
+      if (!data.success) {
+        console.error("Delete failed:", data.message);
+      }
+
+      // If deleted chat was active, switch to next available
+      if (deleteConfirmThread === threadId) {
+        const remaining = conversations.filter(
+          (c) => c.thread_id !== deleteConfirmThread
+        );
+        if (remaining.length > 0) {
+          await loadConversation(remaining[0].thread_id);
+        } else {
+          // No chats left -- create a new one
+          const newId = crypto.randomUUID();
+          setThreadId(newId);
+          localStorage.setItem("thread_id", newId);
+          setMessages([]);
+          setShowWelcome(true);
+        }
+      }
+
+      await loadConversations();
+    } catch (error) {
+      console.error("Failed to delete:", error);
+    }
+    setDeleteConfirmThread(null);
+  };
+
+  const cancelDelete = () => {
+    setDeleteConfirmThread(null);
+  };
+
+  // Sorted conversations: pinned first, then by updated_at
+  const sortedConversations = useMemo(() => {
+    const pinned = [];
+    const unpinned = [];
+    const search = searchQuery.toLowerCase().trim();
+
+    for (const conv of conversations) {
+      const title = (conv.title || "New Chat").toLowerCase();
+      if (search && !title.includes(search)) continue;
+
+      if (pinnedThreads.includes(conv.thread_id)) {
+        pinned.push(conv);
+      } else {
+        unpinned.push(conv);
+      }
+    }
+
+    // Sort each group by updated_at descending
+    const sortByDate = (a, b) => new Date(b.updated_at) - new Date(a.updated_at);
+    pinned.sort(sortByDate);
+    unpinned.sort(sortByDate);
+
+    return [...pinned, ...unpinned];
+  }, [conversations, pinnedThreads, searchQuery]);
+
   return (
     <motion.section
       id="vivgpt-chat"
@@ -574,62 +754,261 @@ export default function ChatSection() {
       <div className="relative flex h-screen overflow-hidden">
 
         {/* Sidebar */}
-        <aside className="hidden w-[270px] flex-shrink-0 flex-col border-r border-white/10 bg-white/[0.03] p-3 md:flex backdrop-blur">
-          <div className="flex items-center gap-2 px-3 py-4">
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
-              <Sparkles className="h-4.5 w-4.5 text-violet-300" />
-            </div>
-            <div className="text-lg font-extrabold tracking-tight">
-              <span className="bg-gradient-to-r from-white via-violet-200 to-sky-200 bg-clip-text text-transparent">
-                VIVGPT
-              </span>
-            </div>
-          </div>
-
-          <button
-            type="button"
-            onClick={newChat}
-            className="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3 py-3 text-sm font-semibold text-violet-100 shadow-[0_0_30px_rgba(139,92,246,0.18)] transition hover:shadow-[0_0_55px_rgba(139,92,246,0.28)] hover:bg-violet-500/20"
-          >
-            <Plus className="h-4 w-4" />
-             New Chat
-          </button>
-
-          <div className="mb-2 px-3 text-xs font-medium text-neutral-400">
-            Recent Chats
-          </div>
-          <div className="flex-1 overflow-y-auto pr-1">
-
-            {conversations.length === 0 ? (
-              <div className="rounded-lg px-2.5 py-2.5 text-sm text-neutral-500">
-                No chats yet
+        <aside
+          className={`${
+            sidebarOpen ? "w-[280px]" : "w-0"
+          } flex-shrink-0 flex-col border-r border-white/10 bg-white/[0.03] backdrop-blur-lg transition-all duration-300 ease-in-out hidden md:flex`}
+        >
+          <div className={`${sidebarOpen ? "opacity-100" : "opacity-0"} transition-opacity duration-200 min-w-[280px] p-4 flex flex-col h-full`}>
+            {/* Sidebar Header */}
+            <div className="flex items-center justify-between px-2 mb-4">
+              <div className="flex items-center gap-2">
+                <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-violet-500/10 ring-1 ring-violet-500/20">
+                  <Sparkles className="h-4.5 w-4.5 text-violet-300" />
+                </div>
+                <div className="text-lg font-extrabold tracking-tight">
+                  <span className="bg-gradient-to-r from-white via-violet-200 to-sky-200 bg-clip-text text-transparent">
+                    VIVGPT
+                  </span>
+                </div>
               </div>
-            ) : (
-              conversations.map((conv) => (
-                <button
-                  key={conv.thread_id}
-                  type="button"
-                  onClick={() => loadConversation(conv.thread_id)}
-                  className={`mb-1 w-full truncate rounded-lg px-2.5 py-2.5 text-left text-sm transition ${
-                  conv.thread_id === threadId
-                      ? "bg-gradient-to-r from-violet-500/25 to-sky-400/15 border-l-2 border-violet-400/70 pl-2 text-white"
-                      : "text-neutral-400 hover:bg-white/5 hover:text-neutral-200"
-                  }`}
-                >
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title="Close sidebar"
+                className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 hover:bg-white/5 hover:text-neutral-200 transition"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </div>
 
-                  {conv.title || "New Chat"}
+            <button
+              type="button"
+              onClick={newChat}
+              className="mb-4 flex items-center justify-center gap-2 rounded-2xl border border-violet-400/30 bg-violet-500/15 px-3 py-3 text-sm font-semibold text-violet-100 shadow-[0_0_30px_rgba(139,92,246,0.18)] transition hover:shadow-[0_0_55px_rgba(139,92,246,0.28)] hover:bg-violet-500/20"
+            >
+              <Plus className="h-4 w-4" />
+              New Chat
+            </button>
+
+            {/* Search Chats */}
+            <div className="relative mb-3">
+              <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-neutral-500" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search chats..."
+                className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-8 pr-8 text-sm text-neutral-200 outline-none placeholder:text-neutral-500 focus:border-violet-400/40 transition"
+              />
+              {searchQuery && (
+                <button
+                  type="button"
+                  onClick={() => setSearchQuery("")}
+                  className="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 hover:text-neutral-300 transition"
+                >
+                  <X className="h-3.5 w-3.5" />
                 </button>
-              ))
-            )}
+              )}
+            </div>
+
+            <div className="mb-2 px-1 text-xs font-medium text-neutral-400 uppercase tracking-wider">
+              {searchQuery ? "Search Results" : "Recent Chats"}
+            </div>
+            <div className="flex-1 overflow-y-auto pr-1 space-y-0.5 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent">
+
+              {sortedConversations.length === 0 ? (
+                <div className="rounded-lg px-3 py-3 text-sm text-neutral-500">
+                  {searchQuery ? "No matching chats" : "No chats yet"}
+                </div>
+              ) : (
+                sortedConversations.map((conv) => (
+                  <div key={conv.thread_id} className="group relative">
+                    {renamingThread === conv.thread_id ? (
+                      <input
+                        ref={renameInputRef}
+                        type="text"
+                        value={renameValue}
+                        onChange={(e) => setRenameValue(e.target.value)}
+                        onKeyDown={handleRenameKeyDown}
+                        onBlur={submitRename}
+                        autoFocus
+                        className="w-full rounded-lg border border-violet-400/50 bg-white/10 px-3 py-2.5 text-sm text-white outline-none"
+                      />
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={(e) => {
+                          if (menuOpenThread === conv.thread_id) {
+                            setMenuOpenThread(null);
+                            return;
+                          }
+                          loadConversation(conv.thread_id);
+                        }}
+                        className={`w-full truncate rounded-lg px-3 py-2.5 pr-10 text-left text-sm transition-all duration-200 ${
+                          conv.thread_id === threadId
+                            ? "bg-gradient-to-r from-violet-500/20 to-sky-400/10 border-l-[3px] border-violet-400/70 text-white font-medium"
+                            : "text-neutral-400 hover:bg-white/5 hover:text-neutral-200"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2">
+                          {pinnedThreads.includes(conv.thread_id) && (
+                            <Pin className="h-3 w-3 flex-shrink-0 text-violet-400" />
+                          )}
+                          <span className="truncate">{conv.title || "New Chat"}</span>
+                        </div>
+                      </button>
+                    )}
+
+                    {renamingThread !== conv.thread_id && (
+                      <div className="absolute right-1 top-1/2 -translate-y-1/2 z-[9999]">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            e.nativeEvent.stopImmediatePropagation();
+                            setMenuOpenThread(menuOpenThread === conv.thread_id ? null : conv.thread_id);
+                          }}
+                          title="More"
+                          className="flex h-7 w-7 items-center justify-center rounded-lg text-neutral-500 hover:text-neutral-200 hover:bg-white/5 transition"
+                          style={{ pointerEvents: 'auto' }}
+                        >
+                          <MoreHorizontal className="h-4 w-4" />
+                        </button>
+
+                        {menuOpenThread === conv.thread_id && (
+                          <div
+                            className="absolute right-0 top-full mt-1 min-w-[155px] rounded-xl border border-white/10 bg-[#1a1a2e] py-1 shadow-2xl backdrop-blur-xl"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              e.nativeEvent.stopImmediatePropagation();
+                            }}
+                            onMouseDown={(e) => {
+                              e.stopPropagation();
+                              e.nativeEvent.stopImmediatePropagation();
+                            }}
+                            style={{ pointerEvents: 'auto', zIndex: 9999 }}
+                          >
+                            <div className="flex flex-col">
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.nativeEvent.stopImmediatePropagation();
+                                  togglePin(conv.thread_id);
+                                  setMenuOpenThread(null);
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-none px-3.5 py-2.5 text-sm text-neutral-300 hover:bg-white/10 hover:text-white"
+                              >
+                                {pinnedThreads.includes(conv.thread_id) ? (
+                                  <PinOff className="h-3.5 w-3.5 flex-shrink-0 text-violet-400" />
+                                ) : (
+                                  <Pin className="h-3.5 w-3.5 flex-shrink-0 text-violet-400" />
+                                )}
+                                <span>{pinnedThreads.includes(conv.thread_id) ? "Unpin Chat" : "Pin Chat"}</span>
+                              </button>
+                              <div className="mx-3 border-t border-white/5" />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.nativeEvent.stopImmediatePropagation();
+                                  startRenaming(conv);
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-none px-3.5 py-2.5 text-sm text-neutral-300 hover:bg-white/10 hover:text-white"
+                              >
+                                <Pencil className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>Rename Chat</span>
+                              </button>
+                              <div className="mx-3 border-t border-white/5" />
+                              <button
+                                type="button"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  e.nativeEvent.stopImmediatePropagation();
+                                  confirmDelete(conv.thread_id);
+                                }}
+                                className="flex w-full items-center gap-2.5 rounded-none px-3.5 py-2.5 text-sm text-red-400 hover:bg-white/10 hover:text-red-300"
+                              >
+                                <Trash2 className="h-3.5 w-3.5 flex-shrink-0" />
+                                <span>Delete Chat</span>
+                              </button>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
           </div>
         </aside>
 
-        {/* Main chat area */}
+        {/* Delete confirmation overlay */}
+        <AnimatePresence>
+          {deleteConfirmThread && (
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+              className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+              onClick={cancelDelete}
+            >
+              <motion.div
+                initial={{ scale: 0.9, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.9, opacity: 0 }}
+                transition={{ duration: 0.2 }}
+                className="mx-4 w-full max-w-sm rounded-2xl border border-white/10 bg-[#1a1a2e] p-6 shadow-2xl"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-red-500/10 ring-1 ring-red-500/20">
+                    <Trash2 className="h-5 w-5 text-red-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-semibold text-white">Delete chat?</h3>
+                    <p className="text-sm text-neutral-400">
+                      This will permanently delete this conversation and its messages.
+                    </p>
+                  </div>
+                </div>
+                <div className="flex justify-end gap-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={cancelDelete}
+                    className="rounded-xl border border-white/10 px-4 py-2.5 text-sm text-neutral-300 transition hover:bg-white/5"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={executeDelete}
+                    className="rounded-xl bg-red-600 px-4 py-2.5 text-sm text-white transition hover:bg-red-500 shadow-lg shadow-red-600/20"
+                  >
+                    Delete Forever
+                  </button>
+                </div>
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* Main chat area - ChatGPT layout */}
         <div className="relative flex flex-1 flex-col overflow-hidden">
           {/* Topbar */}
-          <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(5,8,22,0.7)] px-6 backdrop-blur">
+          <div className="flex h-14 flex-shrink-0 items-center justify-between border-b border-white/10 bg-[rgba(5,8,22,0.7)] px-4 md:px-6 backdrop-blur">
             <div className="flex items-center gap-3">
-              <div className="text-lg font-bold">
+              <button
+                type="button"
+                onClick={toggleSidebar}
+                title={sidebarOpen ? "Close sidebar" : "Open sidebar"}
+                className="flex h-9 w-9 items-center justify-center rounded-lg text-neutral-400 transition hover:bg-white/5 hover:text-white"
+              >
+                {sidebarOpen ? <X className="h-4.5 w-4.5" /> : <Menu className="h-4.5 w-4.5" />}
+              </button>
+              <div className="text-base md:text-lg font-bold">
                 <span className="bg-gradient-to-r from-white via-violet-200 to-sky-200 bg-clip-text text-transparent">
                   Agentic AI Chatbot
                 </span>
@@ -645,206 +1024,204 @@ export default function ChatSection() {
                   />
                   <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-400" />
                 </span>
-                <span className="text-neutral-200">{status === "Ready" ? " Ready" : status}</span>
+                <span className="text-neutral-200 text-xs md:text-sm">{status === "Ready" ? "Ready" : status}</span>
               </span>
             </div>
           </div>
 
-
-          {/* Messages */}
+          {/* Scrollable area - messages + input (like ChatGPT) */}
           <div
             ref={chatContainerRef}
-            className="flex-1 overflow-y-auto px-5 py-8 pb-44"
+            className="flex-1 overflow-y-auto"
           >
-            {showWelcome && messages.length === 0 && (
-              <>
-                <div className="mx-auto mt-12 max-w-3xl text-center md:mt-16">
-                  <div className="relative mx-auto mb-6 h-24 w-full max-w-xl">
-                    <motion.div
-                      initial={{ opacity: 0, scale: 0.9 }}
-                      animate={{ opacity: 1, scale: 1 }}
-                      transition={{ duration: 0.6 }}
-                      className="absolute left-1/2 top-1/2 h-24 w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-violet-500/30 via-sky-400/20 to-emerald-400/10 blur-[2px]"
-                    />
-                    <motion.div
-                      animate={{ y: [0, -10, 0] }}
-                      transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
-                      className="relative mx-auto h-24 w-24 rounded-full bg-violet-500/10 ring-1 ring-violet-400/20"
-                    >
-                      <div className="absolute inset-2 rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.35),rgba(139,92,246,0.45),rgba(56,189,248,0.15))]" />
-                      <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 blur-[1px]" />
-                    </motion.div>
-                  </div>
-
-                  <h2 className="mb-3 text-4xl font-semibold tracking-tight text-white">
-                    Your AI Agent is Ready
-                  </h2>
-                  <p className="mx-auto max-w-2xl text-neutral-400">
-                    Ask questions, analyze documents, search the web and automate tasks.
-                  </p>
-                </div>
-
-                <div className="mx-auto mt-8 grid max-w-2xl grid-cols-1 gap-3 sm:grid-cols-2">
-                  {WELCOME_CARDS.map((card, idx) => {
-                    const Icon = card.icon;
-                    return (
-                      <motion.button
-                        key={card.label}
-                        type="button"
-                        onClick={() => usePrompt(card.text)}
-                        whileHover={{ scale: 1.03 }}
-                        transition={{ type: "spring", stiffness: 260, damping: 18 }}
-                        className="group rounded-2xl border border-white/10 bg-white/[0.04] p-4 text-left text-sm text-neutral-300 backdrop-blur transition hover:border-white/20"
+            <div className="mx-auto max-w-3xl px-4 md:px-5 py-6 md:py-8">
+              {showWelcome && messages.length === 0 && (
+                <>
+                  <div className="mt-8 md:mt-16 text-center">
+                    <div className="relative mx-auto mb-6 h-20 w-20 md:h-24 md:w-24">
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.9 }}
+                        animate={{ opacity: 1, scale: 1 }}
+                        transition={{ duration: 0.6 }}
+                        className="absolute left-1/2 top-1/2 h-20 w-20 md:h-24 md:w-24 -translate-x-1/2 -translate-y-1/2 rounded-full bg-gradient-to-tr from-violet-500/30 via-sky-400/20 to-emerald-400/10 blur-[2px]"
+                      />
+                      <motion.div
+                        animate={{ y: [0, -10, 0] }}
+                        transition={{ duration: 3.5, repeat: Infinity, ease: "easeInOut" }}
+                        className="relative mx-auto h-20 w-20 md:h-24 md:w-24 rounded-full bg-violet-500/10 ring-1 ring-violet-400/20"
                       >
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-sky-400/15 ring-1 ring-white/10">
-                            <Icon className="h-4 w-4 text-violet-300" />
-                          </div>
-                          <div className="font-medium text-neutral-100 group-hover:text-white">
-                            {card.label}
-                          </div>
-                        </div>
-                      </motion.button>
-                    );
-                  })}
-                </div>
+                        <div className="absolute inset-2 rounded-full bg-[radial-gradient(circle_at_35%_30%,rgba(255,255,255,0.35),rgba(139,92,246,0.45),rgba(56,189,248,0.15))]" />
+                        <div className="absolute left-1/2 top-1/2 h-2 w-2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white/70 blur-[1px]" />
+                      </motion.div>
+                    </div>
 
-              </>
-            )}
-
-            {messages.map((msg, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ duration: 0.4 }}
-                className={`mx-auto mb-7 flex max-w-3xl gap-3 ${
-                  msg.role === "user" ? "justify-end" : "justify-start"
-                }`}
-              >
-                {msg.role === "assistant" && (
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-sky-400 shadow-[0_0_30px_rgba(139,92,246,0.25)]">
-                    <span className="text-xs font-bold text-white">AI</span>
+                    <h2 className="mb-3 text-2xl md:text-4xl font-semibold tracking-tight text-white px-2">
+                      Your AI Agent is Ready
+                    </h2>
+                    <p className="mx-auto max-w-2xl text-sm md:text-base text-neutral-400 px-4">
+                      Ask questions, analyze documents, search the web and automate tasks.
+                    </p>
                   </div>
-                )}
 
-                <div
-                  className={`max-w-[75%] whitespace-pre-wrap break-words text-base leading-relaxed ${
-                  msg.role === "user"
-                      ? "rounded-2xl border border-white/10 bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-3 text-white shadow-[0_0_40px_rgba(139,92,246,0.20)]"
-                      : "rounded-2xl border border-white/10 bg-white/[0.05] px-4 py-3 text-neutral-100"
+                  <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-3 px-2">
+                    {WELCOME_CARDS.map((card, idx) => {
+                      const Icon = card.icon;
+                      return (
+                        <motion.button
+                          key={card.label}
+                          type="button"
+                          onClick={() => usePrompt(card.text)}
+                          whileHover={{ scale: 1.03 }}
+                          transition={{ type: "spring", stiffness: 260, damping: 18 }}
+                          className="group rounded-2xl border border-white/10 bg-white/[0.04] p-3 md:p-4 text-left text-xs md:text-sm text-neutral-300 backdrop-blur transition hover:border-white/20"
+                        >
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-8 w-8 md:h-9 md:w-9 items-center justify-center rounded-xl bg-gradient-to-br from-violet-500/20 to-sky-400/15 ring-1 ring-white/10">
+                              <Icon className="h-3.5 w-3.5 md:h-4 md:w-4 text-violet-300" />
+                            </div>
+                            <div className="font-medium text-neutral-100 group-hover:text-white">
+                              {card.label}
+                            </div>
+                          </div>
+                        </motion.button>
+                      );
+                    })}
+                  </div>
+                </>
+              )}
+
+              {messages.map((msg, i) => (
+                <motion.div
+                  key={i}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.4 }}
+                  className={`mb-5 md:mb-7 flex gap-3 ${
+                    msg.role === "user" ? "justify-end" : "justify-start"
                   }`}
                 >
-                  {String(msg.content)
-                    .replace(/\*\*(.*?)\*\*/g, "$1")
-                    .replace(/(^|\n)\s*[-*]\s+/g, "$1")
-                    .replace(/(^|\n)\s*#{1,6}\s+/g, "$1")
-                    .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")}
-                </div>
-                {msg.role === "user" && (
-                  <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-sky-400/20 ring-1 ring-white/10">
-                    <span className="text-xs font-bold text-white">U</span>
-                  </div>
-                )}
-
-              </motion.div>
-            ))}
-
-            {toolProgress && (
-              <div className="mx-auto mb-4 flex max-w-3xl justify-start">
-                <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-neutral-300 backdrop-blur shadow-[0_0_35px_rgba(16,185,129,0.10)]">
-                  {toolProgress.done ? (
-                    <Check className="h-3.5 w-3.5 text-emerald-400" />
-                  ) : (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                  {msg.role === "assistant" && (
+                    <div className="flex h-8 w-8 md:h-9 md:w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 to-sky-400 shadow-[0_0_30px_rgba(139,92,246,0.25)]">
+                      <span className="text-[10px] md:text-xs font-bold text-white">AI</span>
+                    </div>
                   )}
-                  {toolProgress.done
-                    ? `${toolProgress.name} completed`
-                    : `Using ${toolProgress.name}...`}
+
+                  <div
+                    className={`max-w-[85%] md:max-w-[75%] whitespace-pre-wrap break-words text-sm md:text-base leading-relaxed ${
+                    msg.role === "user"
+                        ? "rounded-2xl border border-white/10 bg-gradient-to-r from-violet-600 to-indigo-600 px-3 md:px-4 py-2.5 md:py-3 text-white shadow-[0_0_40px_rgba(139,92,246,0.20)]"
+                        : "rounded-2xl border border-white/10 bg-white/[0.05] px-3 md:px-4 py-2.5 md:py-3 text-neutral-100"
+                    }`}
+                  >
+                    {String(msg.content)
+                      .replace(/\*\*(.*?)\*\*/g, "$1")
+                      .replace(/(^|\n)\s*[-*]\s+/g, "$1")
+                      .replace(/(^|\n)\s*#{1,6}\s+/g, "$1")
+                      .replace(/`{1,3}([^`]+)`{1,3}/g, "$1")}
+                  </div>
+                  {msg.role === "user" && (
+                    <div className="flex h-8 w-8 md:h-9 md:w-9 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500/30 to-sky-400/20 ring-1 ring-white/10">
+                      <span className="text-[10px] md:text-xs font-bold text-white">U</span>
+                    </div>
+                  )}
+                </motion.div>
+              ))}
+
+              {toolProgress && (
+                <div className="mb-4 flex justify-start">
+                  <div className="inline-flex items-center gap-2 rounded-2xl border border-white/10 bg-white/[0.06] px-3 py-2 text-sm text-neutral-300 backdrop-blur shadow-[0_0_35px_rgba(16,185,129,0.10)]">
+                    {toolProgress.done ? (
+                      <Check className="h-3.5 w-3.5 text-emerald-400" />
+                    ) : (
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-emerald-400" />
+                    )}
+                    {toolProgress.done
+                      ? `${toolProgress.name} completed`
+                      : `Using ${toolProgress.name}...`}
+                  </div>
                 </div>
+              )}
+
+              {/* Input area - inside scrollable (like ChatGPT) */}
+              <div className="mt-6 mb-4">
+                <div className="flex items-end gap-2 rounded-2xl md:rounded-3xl border border-white/10 bg-white/[0.06] p-2 md:p-3 shadow-[0_0_60px_rgba(139,92,246,0.10)] backdrop-blur-xl">
+
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept=".pdf,.docx,.txt,.md,.py,.csv"
+                    onChange={uploadFile}
+                  />
+
+                  <button
+                    type="button"
+                    onClick={() => fileInputRef.current?.click()}
+                    title="Upload document"
+                    className="flex h-9 w-9 md:h-10 md:w-10 flex-shrink-0 items-center justify-center rounded-xl text-neutral-400 transition hover:bg-white/10 hover:text-white"
+                  >
+                    <Paperclip className="h-4 w-4 md:h-5 md:w-5" />
+                  </button>
+
+                  <textarea
+                    ref={textareaRef}
+                    value={inputValue}
+                    onChange={(e) => {
+                      setInputValue(e.target.value);
+                      autoResize(e.target);
+                    }}
+                    onKeyDown={handleKeyDown}
+                    placeholder="Ask anything..."
+                    rows={1}
+                    className="max-h-40 min-h-[28px] md:min-h-[30px] flex-1 resize-none bg-transparent py-1.5 md:py-2 text-sm md:text-base text-neutral-100 outline-none placeholder:text-neutral-500"
+                  />
+
+                  <select
+                    value={selectedModel}
+                    onChange={handleModelChange}
+                    title="Select model"
+                    className="h-9 md:h-10 max-w-[110px] md:max-w-[135px] flex-shrink-0 cursor-pointer rounded-xl border border-white/10 bg-white/5 px-1.5 md:px-2 text-[10px] md:text-xs text-neutral-200 outline-none"
+                  >
+                    {MODELS.map((m) => (
+                      <option key={m} value={m} className="bg-[#171717]">
+                        {m}
+                      </option>
+                    ))}
+                  </select>
+
+                  <button
+                    type="button"
+                    onClick={toggleDictation}
+                    title="Dictate"
+                    className={`flex h-9 w-9 md:h-10 md:w-10 flex-shrink-0 items-center justify-center rounded-xl transition ${
+                      isDictating
+                        ? "bg-red-500 text-white"
+                        : "text-neutral-400 hover:bg-white/10 hover:text-white"
+                    }`}
+                  >
+                    {isDictating ? (
+                      <MicOff className="h-4 w-4 md:h-5 md:w-5" />
+                    ) : (
+                      <Mic className="h-4 w-4 md:h-5 md:w-5" />
+                    )}
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={sendMessage}
+                    disabled={isSending}
+                    className="flex h-9 w-9 md:h-10 md:w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-sky-400 text-white shadow-[0_0_60px_rgba(139,92,246,0.35)] transition hover:scale-110 disabled:cursor-not-allowed disabled:scale-100 disabled:opacity-60"
+                  >
+                    <Send className="h-3.5 w-3.5 md:h-4 md:w-4" />
+                  </button>
+
+                </div>
+
+                <p className="mt-2 text-center text-[10px] md:text-xs text-neutral-500">
+                  {notice}
+                </p>
               </div>
-            )}
-
-          </div>
-
-          {/* Input area */}
-          <div className="absolute bottom-0 left-0 right-0 px-5 pb-6 pt-10 md:left-[270px]">
-            <div className="mx-auto flex max-w-3xl items-end gap-2 rounded-3xl border border-white/10 bg-white/[0.06] p-3 shadow-[0_0_60px_rgba(139,92,246,0.10)] backdrop-blur-xl">
-
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                accept=".pdf,.docx,.txt,.md,.py,.csv"
-                onChange={uploadFile}
-              />
-
-              <button
-                type="button"
-                onClick={() => fileInputRef.current?.click()}
-                title="Upload document"
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl text-neutral-400 transition hover:bg-white/10 hover:text-white"
-              >
-                <Paperclip className="h-5 w-5" />
-              </button>
-
-              <textarea
-                ref={textareaRef}
-                value={inputValue}
-                onChange={(e) => {
-                  setInputValue(e.target.value);
-                  autoResize(e.target);
-                }}
-                onKeyDown={handleKeyDown}
-                placeholder="Ask anything..."
-                rows={1}
-                className="max-h-40 min-h-[30px] flex-1 resize-none bg-transparent py-2 text-base text-neutral-100 outline-none placeholder:text-neutral-500"
-              />
-
-              <select
-                value={selectedModel}
-                onChange={handleModelChange}
-                title="Select model"
-                className="h-10 max-w-[135px] flex-shrink-0 cursor-pointer rounded-xl border border-white/10 bg-white/5 px-2 text-xs text-neutral-200 outline-none"
-              >
-                {MODELS.map((m) => (
-                  <option key={m} value={m} className="bg-[#171717]">
-                    {m}
-                  </option>
-                ))}
-              </select>
-
-              <button
-                type="button"
-                onClick={toggleDictation}
-                title="Dictate"
-                className={`flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-xl transition ${
-                  isDictating
-                    ? "bg-red-500 text-white"
-                    : "text-neutral-400 hover:bg-white/10 hover:text-white"
-                }`}
-              >
-                {isDictating ? (
-                  <MicOff className="h-5 w-5" />
-                ) : (
-                  <Mic className="h-5 w-5" />
-                )}
-              </button>
-
-              <button
-                type="button"
-                onClick={sendMessage}
-                disabled={isSending}
-                className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-full bg-gradient-to-tr from-violet-600 via-indigo-600 to-sky-400 text-white shadow-[0_0_60px_rgba(139,92,246,0.35)] transition hover:scale-110 disabled:cursor-not-allowed disabled:scale-100 disabled:opacity-60"
-              >
-                <Send className="h-4 w-4" />
-              </button>
-
             </div>
-
-            <p className="mx-auto mt-2 max-w-3xl text-center text-xs text-neutral-500">
-              {notice}
-            </p>
           </div>
         </div>
       </div>
