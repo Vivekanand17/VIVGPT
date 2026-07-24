@@ -4,10 +4,6 @@ import tailwindcss from "@tailwindcss/vite";
 
 export default defineConfig({
   plugins: [react(), tailwindcss()],
-  build: {
-    outDir: "../static",
-    emptyOutDir: true,
-  },
   server: {
     proxy: {
       "/chat": "http://127.0.0.1:8080",
