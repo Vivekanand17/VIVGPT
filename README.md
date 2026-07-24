@@ -6,6 +6,75 @@ It supports real-time streaming chat, document uploads, retrieval-augmented gene
 
 ---
 
+## Quick Start
+
+### Prerequisites
+- Python 3.11
+- Node.js (for frontend build)
+- Google Gemini API key
+- Tavily API key
+
+### 1. Backend Setup
+
+```bash
+# Create and activate virtual environment
+conda create -n vivgpt python=3.11 -y
+conda activate vivgpt
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file with your API keys
+# GOOGLE_API_KEY=your_key
+# TAVILY_API_KEY=your_key
+
+# Start the backend server
+uvicorn backend.app:app --host 0.0.0.0 --port 8080 --reload
+```
+
+The backend will be available at **http://127.0.0.1:8080**
+
+### 2. Frontend Setup (optional — for development)
+
+```bash
+# Navigate to frontend directory
+cd frontend
+
+# Install npm dependencies
+npm install
+
+# Start the Vite dev server with HMR
+npm run dev
+```
+
+The frontend dev server will be available at **http://localhost:5173** (with API proxy to backend :8080).
+
+### 3. Build Frontend for Production
+
+```bash
+cd frontend && npm run build
+```
+
+This outputs static files to the `static/` directory, which the backend serves automatically.
+
+---
+
+## Deploy on Render
+
+1. Connect your GitHub repo to Render
+2. Create a **Web Service**
+3. Use these settings:
+
+| Setting | Value |
+|---------|-------|
+| **Build Command** | `pip install -r requirements.txt` |
+| **Start Command** | `uvicorn backend.app:app --host 0.0.0.0 --port 8080` |
+| **Root Directory** | (leave as project root) |
+
+4. Add environment variables (`.env` contents) in Render dashboard
+
+---
+
 ## Features
 
 * Chat with an AI agent powered by Google Gemini
